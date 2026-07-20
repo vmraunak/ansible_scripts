@@ -11,31 +11,54 @@
       - containerd.io
       - docker-buildx-plugin
       - docker-compose-plugin
+      - docker-ce-rootless-extras
 
   tasks:
-    - name: Removing Dcoker From RHEL based Systems
+    - name: Removing Docker Service
+      ansible.builtin.systemd:
+        name: docker
+        state: stopped
+        enabled: false
+
+    - name: Stop Docker Socket
+      ansible.builtin.systemd:
+        name: docker.socket
+        state: stopped
+        enabled: false
+
+    - name: Removing Dcoker From RHEL Systems
       when: ansible_os_family == "RedHat"
       block:
 
-        - name: Removing Docker Service
-          ansible.builtin.systemd:
-            name: docker
-            state: stopped
-            enabled: false
-
-        - name: Stop Docker Socket
-          ansible.builtin.systemd:
-            name: docker.socket
-            state: stopped
-            enabled: false
-
-        - name: Remove Docker packages
+        - name: Remove Docker packages from RHEL Systems
           ansible.builtin.dnf:
             name: "{{ docker_packages }}"
             state: absent
 
-        - name: Removing Docker Repo
+        - name: Removing Yum Docker Repo
           ansible.builtin.yum_repository:
             name: docker-ce
+            state: absent
+
+    - name: Removing Docker Debian Systems
+      when: ansible_os_family == "Debian"
+      block:
+
+        - name: Remove Docker packages
+          ansible.builtin.apt:
+            name: "{{ docker_packages }}"
+            state: absent
+            autoremove: true
+            purge: true
+
+        - name: Removing Apt Docker Repo File
+          ansible.builtin.apt_repository:
+            repo: "deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+            filename: docker
+            state: absent
+
+        - name: Remove GPG Key
+          ansible.builtin.file:
+            path: /etc/apt/keyrings/docker.asc
             state: absent
 ...

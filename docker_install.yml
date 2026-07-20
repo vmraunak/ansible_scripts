@@ -27,7 +27,7 @@
 
   tasks:
 
-    - name: Docker Script for Alma Linux and Redhat
+    - name: Docker Installation for Alma Linux and Redhat
       block:
 
         - name: Remove conflicting packages
