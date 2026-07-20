@@ -1,0 +1,41 @@
+---
+- name: Remove Docker Via Ansible
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    docker_packages:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+
+  tasks:
+    - name: Removing Dcoker From RHEL based Systems
+      when: ansible_os_family == "RedHat"
+      block:
+
+        - name: Removing Docker Service
+          ansible.builtin.systemd:
+            name: docker
+            state: stopped
+            enabled: false
+
+        - name: Stop Docker Socket
+          ansible.builtin.systemd:
+            name: docker.socket
+            state: stopped
+            enabled: false
+
+        - name: Remove Docker packages
+          ansible.builtin.dnf:
+            name: "{{ docker_packages }}"
+            state: absent
+
+        - name: Removing Docker Repo
+          ansible.builtin.yum_repository:
+            name: docker-ce
+            state: absent
+...

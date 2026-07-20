@@ -1,0 +1,130 @@
+---
+- name: Install Docker via Ansible
+  hosts: all
+  gather_facts: true
+  become: true
+
+  vars:
+    docker_packages:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+
+    conflicting_packages:
+      - podman
+      - buildah
+      - docker
+      - docker-client
+      - docker-client-latest
+      - docker-common
+      - docker-latest
+      - docker-latest-logrotate
+      - docker-logrotate
+      - docker-engine
+      - runc
+
+  tasks:
+
+    - name: Docker Script for Alma Linux and Redhat
+      block:
+
+        - name: Remove conflicting packages
+          ansible.builtin.dnf:
+            name: "{{ conflicting_packages }}"
+            state: absent
+
+        - name: Install dnf plugins
+          ansible.builtin.dnf:
+            name: dnf-plugins-core
+            state: present
+
+        - name: Add Docker repository for Alma Linux
+          ansible.builtin.yum_repository:
+            name: docker-ce
+            description: Docker CE Repository
+            baseurl: https://download.docker.com/linux/centos/$releasever/$basearch/stable
+            enabled: true
+            gpgcheck: true
+            gpgkey: https://download.docker.com/linux/centos/gpg
+          when: ansible_distribution == "AlmaLinux"
+
+        - name: Add Docker repository for RHEL
+          ansible.builtin.yum_repository:
+            name: docker-ce
+            description: Docker CE Repository
+            baseurl: https://download.docker.com/linux/rhel/$releasever/$basearch/stable
+            enabled: true
+            gpgcheck: true
+            gpgkey: https://download.docker.com/linux/rhel/gpg
+          when: ansible_distribution == "RedHat"          
+
+        - name: Install Docker packages
+          ansible.builtin.dnf:
+            name: "{{ docker_packages }}"
+            state: present
+
+        - name: Enable and start Docker
+          ansible.builtin.service:
+            name: docker
+            state: started
+            enabled: true
+
+    - name: Docker Script for Ubuntu
+      when: ansible_os_family == "Debian"
+      block:
+
+        - name: Update apt cache
+          ansible.builtin.apt:
+            update_cache: true
+
+        - name: Install dependencies
+          ansible.builtin.package:
+            name:
+              - bc
+              - curl
+              - expect
+              - git
+              - ca-certificates
+            state: present
+
+        - name: Create keyring directory
+          ansible.builtin.file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: "0755"
+
+        - name: Download Docker GPG key
+          ansible.builtin.get_url:
+            url: https://download.docker.com/linux/ubuntu/gpg
+            dest: /etc/apt/keyrings/docker.asc
+            mode: "0644"
+
+        - name: Add Docker repository
+          ansible.builtin.apt_repository:
+            repo: "deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+            state: present
+            filename: docker
+
+        - name: Update apt cache after adding repository
+          ansible.builtin.apt:
+            update_cache: true
+
+        - name: Install Docker packages
+          ansible.builtin.package:
+            name: "{{ docker_packages }}"
+            state: present
+
+        - name: Enable and start Docker
+          ansible.builtin.service:
+            name: docker
+            state: started
+            enabled: true
+
+        - name: Add ubuntu user to docker group
+          ansible.builtin.user:
+            name: ubuntu
+            groups: docker
+            append: true
+...
