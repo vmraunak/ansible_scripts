@@ -25,7 +25,7 @@
         name: docker.socket
         state: stopped
         enabled: false
-
+# --------------------------- For RHEL Based Systems ---------------------------------- #
     - name: Removing Dcoker From RHEL Systems
       when: ansible_os_family == "RedHat"
       block:
@@ -39,7 +39,7 @@
           ansible.builtin.yum_repository:
             name: docker-ce
             state: absent
-
+# --------------------------- For Debian Based Systems ---------------------------------- #
     - name: Removing Docker Debian Systems
       when: ansible_os_family == "Debian"
       block:

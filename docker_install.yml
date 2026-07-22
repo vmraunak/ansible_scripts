@@ -26,7 +26,7 @@
       - runc
 
   tasks:
-
+# --------------------------- For RHEL Based Systems ---------------------------------- #
     - name: Docker Installation for Alma Linux and Redhat
       block:
 
@@ -70,7 +70,7 @@
             name: docker
             state: started
             enabled: true
-
+# --------------------------- For Debian Based Systems ---------------------------------- #
     - name: Docker Script for Ubuntu
       when: ansible_os_family == "Debian"
       block:
