@@ -1,0 +1,115 @@
+---
+- name: Zabbix Installation Script
+  gather_facts: true
+  hosts: all
+  become: true
+
+  vars: 
+    zabbix_server: "{{ server | default('') }}"
+    zabbix_hostname: "{{ host | default('') }}"
+    config_file: "/etc/zabbix/zabbix_agent2.conf"
+
+  tasks:
+    # --------------------------- Service Facts Gathering ----------------------- #
+    - name: Populate service facts
+      ansible.builtin.service_facts:
+
+    
+    # -------------------------------------------------------------------------
+    # Verify configuration file exists
+    # -------------------------------------------------------------------------
+    - name: Check if Zabbix Configuration File exists
+      ansible.builtin.stat: 
+        path: "{{ config_file }}"
+      register: file_check 
+
+    - name: Ansible File Found - exit 
+      ansible.builtin.debug: 
+        msg: "File found. Exiting."
+      when: file_check.stat.exists
+  
+    - name: Stop Play-Book if file exists 
+      ansible.builtin.meta: end_play
+      when: file_check.stat.exists
+      no_log: true # Supressing output task message
+
+# -------------------------------------------------------------------------
+# Rocky 9 Installation
+# -------------------------------------------------------------------------
+    - name: Install GPG Keys
+      ansible.builtin.rpm_key:
+        state: present
+        key: "{{ item }}"
+      loop: 
+        - https://repo.zabbix.com/RPM-GPG-KEY-ZABBIX-08EFA7DD
+        - https://repo.zabbix.com/RPM-GPG-KEY-ZABBIX-B5333005
+
+    - name: Adding Zabbix Repo
+      ansible.builtin.dnf:
+        name: https://repo.zabbix.com/zabbix/7.4/release/rocky/9/noarch/zabbix-release-latest-7.4.el9.noarch.rpm
+        state: present
+        disablerepo: "pgdg*"
+
+    - name: Install Zabbix Agent 2
+      ansible.builtin.dnf:
+        name: zabbix-agent2
+        state: present
+        #disablerepo: "pgdg*"
+      when:
+        - ansible_distribution == "Rocky"
+        - ansible_distribution_major_version == "9"
+
+    # -------------------------------------------------------------------------
+    # Firewall Configuration
+    # -------------------------------------------------------------------------
+    
+    - name: Allow TCP port 10050 in firewalld immediately and permanently
+      ansible.builtin.command:
+        cmd: firewall-cmd --permanent --zone=public --add-port=10050/tcp
+      register: firewall_result
+      changed_when: "'ALREADY_ENABLED' not in firewall_result.stderr"
+      when:
+        - ansible_facts.services['firewalld.service'] is defined
+        - ansible_facts.services['firewalld.service'].state == 'running'
+
+    - name: Reload Firewalld
+      ansible.builtin.command:
+        cmd: firewall-cmd --reload
+      register: firewall_result
+      changed_when: "'ALREADY_ENABLED' not in firewall_result.stderr"
+      when:
+        - ansible_facts.services['firewalld.service'] is defined
+        - ansible_facts.services['firewalld.service'].state == 'running'
+    # -------------------------------------------------------------------------
+    # Making Changes to the configuration file
+    # -------------------------------------------------------------------------
+    
+    - name: Check if 'server' and 'host' contain actual text content
+      ansible.builtin.assert:
+        that:
+          - zabbix_server is defined and (zabbix_server | string | trim | length > 0)
+          - zabbix_hostname is defined and (zabbix_hostname | string | trim | length > 0)
+        fail_msg: >- 
+          ERROR: Missing required arguments!
+
+    - name: Editing config file via Ansible
+      ansible.builtin.lineinfile:
+        path: "{{ config_file }}"
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+      loop:
+        - { regexp: '^#?\s*Server=.*', line: "Server={{ zabbix_server }}" }
+        - { regexp: '^#?\s*ServerActive=.*', line: "ServerActive={{ zabbix_server }}" }
+        - { regexp: '^#?\s*Hostname=.*', line: "Hostname={{ zabbix_hostname }}" }
+
+    # -------------------------------------------------------------------------
+    # Service Management
+    # -------------------------------------------------------------------------
+    
+    - name: Enable and start Zabbix Agent 2 service
+      ansible.builtin.systemd:
+        name: zabbix-agent2
+        state: started
+        enabled: true
+        daemon_reload: true
+...
