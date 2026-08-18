@@ -1,0 +1,43 @@
+---
+- name: Zabbix config Changes
+  hosts: all
+  become: true
+  gather_facts: false
+  vars: 
+    zabbix_server: "{{ server | default('') }}"
+    zabbix_hostname: "{{ host | default('') }}"
+    config_file: "/etc/zabbix/zabbix_agent2.conf"
+
+  tasks:
+    # -------------------------------------------------------------------------
+    # Making Changes to the configuration file
+    # -------------------------------------------------------------------------
+  - name: Check if 'server' and 'host' contain actual text content
+    ansible.builtin.assert:
+      that:
+        - zabbix_server is defined and (zabbix_server | string | trim | length > 0)
+        - zabbix_hostname is defined and (zabbix_hostname | string | trim | length > 0)
+      fail_msg: >- 
+        ERROR: Missing required arguments!
+
+  - name: Editing config file via Ansible
+    ansible.builtin.lineinfile:
+      path: "{{ config_file }}"
+      regexp: "{{ item.regexp }}"
+      line: "{{ item.line }}"
+    loop:
+      - { regexp: '^#?\s*Server=.*', line: "Server={{ zabbix_server }}" }
+      - { regexp: '^#?\s*ServerActive=.*', line: "ServerActive={{ zabbix_server }}" }
+      - { regexp: '^#?\s*Hostname=.*', line: "Hostname={{ zabbix_hostname }}" }
+    notify: Restart Zabbix Agent
+    # -------------------------------------------------------------------------
+    # Service Management
+    # -------------------------------------------------------------------------
+  handlers: 
+  - name: Restart Zabbix Agent
+    ansible.builtin.systemd:
+      name: zabbix-agent2
+      state: restarted
+      enabled: true
+      daemon_reload: true
+...
