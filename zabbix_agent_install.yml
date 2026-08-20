@@ -10,58 +10,93 @@
     config_file: "/etc/zabbix/zabbix_agent2.conf"
 
   tasks:
-    # --------------------------- Service Facts Gathering ----------------------- #
-    - name: Populate service facts
-      ansible.builtin.service_facts:
+# -------------------------------------------------------------------------
+# Pre-checks and Validation
+# -------------------------------------------------------------------------
 
-    
-    # -------------------------------------------------------------------------
-    # Verify configuration file exists
-    # -------------------------------------------------------------------------
     - name: Check if Zabbix Configuration File exists
       ansible.builtin.stat: 
         path: "{{ config_file }}"
-      register: file_check 
+      register: file_check
+      when: false
 
     - name: Ansible File Found - exit 
       ansible.builtin.debug: 
         msg: "File found. Exiting."
       when: file_check.stat.exists
+      when: false
+
   
     - name: Stop Play-Book if file exists 
       ansible.builtin.meta: end_play
       when: file_check.stat.exists
       no_log: true # Supressing output task message
+      when: false
 
 # -------------------------------------------------------------------------
-# Rocky 9 Installation
+# Adding Repos & Package Installation 
 # -------------------------------------------------------------------------
     - name: Install GPG Keys
-      ansible.builtin.rpm_key:
-        state: present
-        key: "{{ item }}"
+      ansible.builtin.command:
+        cmd: "rpm --import {{ item }}"
       loop: 
         - https://repo.zabbix.com/RPM-GPG-KEY-ZABBIX-08EFA7DD
         - https://repo.zabbix.com/RPM-GPG-KEY-ZABBIX-B5333005
+        
+      when: ansible_os_family == "RedHat"
 
-    - name: Adding Zabbix Repo
-      ansible.builtin.dnf:
-        name: https://repo.zabbix.com/zabbix/7.4/release/rocky/9/noarch/zabbix-release-latest-7.4.el9.noarch.rpm
-        state: present
-        disablerepo: "pgdg*"
+    - name: Adding Repos to the Various Linux
+      block:
+
+# RHEL repo
+
+        - name: Adding Zabbix Repo to RHEL
+          ansible.builtin.dnf:
+            name: https://repo.zabbix.com/zabbix/7.4/release/rhel/{{ ansible_distribution_major_version }}/noarch/zabbix-release-latest-7.4.el{{ ansible_distribution_major_version }}.noarch.rpm
+            state: present 
+          when: ansible_distribution == "RedHat"
+
+# Rocky repo
+
+        - name: Adding Zabbix Repo to Rocky
+          ansible.builtin.dnf:
+           name: https://repo.zabbix.com/zabbix/7.4/release/rocky/{{ ansible_distribution_major_version }}/noarch/zabbix-release-latest-7.4.el{{ ansible_distribution_major_version }}.noarch.rpm
+           state: present 
+          when: ansible_distribution == "Rocky"
+
+# Alma Linux repo
+
+        - name: Adding Zabbix Repo to Alma Linux 
+          ansible.builtin.dnf:
+           name: https://repo.zabbix.com/zabbix/7.4/release/alma/{{ ansible_distribution_major_version }}/noarch/zabbix-release-latest-7.4.el{{ ansible_distribution_major_version }}.noarch.rpm
+           state: present 
+          when: ansible_distribution == "AlmaLinux"
+
+# CentsOS repo
+
+        - name: Adding Zabbix Repo to CentOS 
+          ansible.builtin.dnf:
+           name: https://repo.zabbix.com/zabbix/7.4/release/centos/{{ ansible_distribution_major_version }}/noarch/zabbix-release-latest-7.4.el{{ ansible_distribution_major_version }}.noarch.rpm
+           state: present 
+          when: ansible_distribution == "AlmaLinux"
+
+# -------------------------------------------------------------------------
+# Installing Zabbix  
+# -------------------------------------------------------------------------
 
     - name: Install Zabbix Agent 2
       ansible.builtin.dnf:
         name: zabbix-agent2
         state: present
         #disablerepo: "pgdg*"
-      when:
-        - ansible_distribution == "Rocky"
-        - ansible_distribution_major_version == "9"
+      when: ansible_distribution_file_variety == "RedHat"
+    
+# -------------------------------------------------------------------------
+# Firewall Configuration
+# -------------------------------------------------------------------------
 
-    # -------------------------------------------------------------------------
-    # Firewall Configuration
-    # -------------------------------------------------------------------------
+    - name: Populate service facts
+      ansible.builtin.service_facts:
     
     - name: Allow TCP port 10050 in firewalld immediately and permanently
       ansible.builtin.command:
