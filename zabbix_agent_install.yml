@@ -18,20 +18,16 @@
       ansible.builtin.stat: 
         path: "{{ config_file }}"
       register: file_check
-      when: false
 
     - name: Ansible File Found - exit 
       ansible.builtin.debug: 
         msg: "File found. Exiting."
       when: file_check.stat.exists
-      when: false
 
-  
     - name: Stop Play-Book if file exists 
       ansible.builtin.meta: end_play
       when: file_check.stat.exists
       no_log: true # Supressing output task message
-      when: false
 
 # -------------------------------------------------------------------------
 # Adding Repos & Package Installation 
@@ -78,7 +74,7 @@
           ansible.builtin.dnf:
            name: https://repo.zabbix.com/zabbix/7.4/release/centos/{{ ansible_distribution_major_version }}/noarch/zabbix-release-latest-7.4.el{{ ansible_distribution_major_version }}.noarch.rpm
            state: present 
-          when: ansible_distribution == "AlmaLinux"
+          when: ansible_distribution == "CentOS"
 
 # -------------------------------------------------------------------------
 # Installing Zabbix  
@@ -89,7 +85,7 @@
         name: zabbix-agent2
         state: present
         #disablerepo: "pgdg*"
-      when: ansible_distribution_file_variety == "RedHat"
+      when: ansible_os_family == "RedHat"
     
 # -------------------------------------------------------------------------
 # Firewall Configuration
