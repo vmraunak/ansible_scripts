@@ -84,7 +84,7 @@
       ansible.builtin.dnf:
         name: zabbix-agent2
         state: present
-        #disablerepo: "pgdg*"
+          #disablerepo: "pgdg*"
       when: ansible_os_family == "RedHat"
     
 # -------------------------------------------------------------------------

@@ -27,7 +27,8 @@
 
   tasks:
 # --------------------------- For RHEL Based Systems ---------------------------------- #
-    - name: Docker Installation for Alma Linux and Redhat
+    - name: Docker Installation for AlmaLinux, RedHat, and Rocky Linux
+      when: ansible_os_family == "RedHat"
       block:
 
         - name: Remove conflicting packages
@@ -40,25 +41,25 @@
             name: dnf-plugins-core
             state: present
 
-        - name: Add Docker repository for Alma Linux
-          ansible.builtin.yum_repository:
-            name: docker-ce
-            description: Docker CE Repository
-            baseurl: https://download.docker.com/linux/centos/$releasever/$basearch/stable
-            enabled: true
-            gpgcheck: true
-            gpgkey: https://download.docker.com/linux/centos/gpg
-          when: ansible_distribution == "AlmaLinux"
-
         - name: Add Docker repository for RHEL
           ansible.builtin.yum_repository:
             name: docker-ce
-            description: Docker CE Repository
+            description: Docker CE Repository - RHEL
             baseurl: https://download.docker.com/linux/rhel/$releasever/$basearch/stable
             enabled: true
-            gpgcheck: true
             gpgkey: https://download.docker.com/linux/rhel/gpg
-          when: ansible_distribution == "RedHat"          
+            gpgcheck: true
+          when: ansible_distribution == "RedHat"
+
+        - name: Add Docker repository for Rocky Linux 
+          ansible.builtin.yum_repository:
+            name: docker-ce
+            description: Docker CE Repository - RHEL
+            baseurl: https://download.docker.com/linux/centos/$releasever/$basearch/stable
+            enabled: true
+            gpgkey: https://download.docker.com/linux/centos/gpg
+            gpgcheck: true
+          when: ansible_distribution in ['Rocky', 'AlmaLinux', 'CentOS']
 
         - name: Install Docker packages
           ansible.builtin.dnf:
@@ -70,8 +71,9 @@
             name: docker
             state: started
             enabled: true
+
 # --------------------------- For Debian Based Systems ---------------------------------- #
-    - name: Docker Script for Ubuntu
+    - name: Docker Script for Ubuntu / Debian
       when: ansible_os_family == "Debian"
       block:
 
@@ -80,13 +82,11 @@
             update_cache: true
 
         - name: Install dependencies
-          ansible.builtin.package:
+          ansible.builtin.apt:
             name:
-              - bc
-              - curl
-              - expect
-              - git
               - ca-certificates
+              - curl
+              - gnupg
             state: present
 
         - name: Create keyring directory
@@ -103,18 +103,15 @@
 
         - name: Add Docker repository
           ansible.builtin.apt_repository:
-            repo: "deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+            repo: "deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
             state: present
             filename: docker
 
-        - name: Update apt cache after adding repository
-          ansible.builtin.apt:
-            update_cache: true
-
         - name: Install Docker packages
-          ansible.builtin.package:
+          ansible.builtin.apt:
             name: "{{ docker_packages }}"
             state: present
+            update_cache: true
 
         - name: Enable and start Docker
           ansible.builtin.service:
@@ -127,4 +124,5 @@
             name: ubuntu
             groups: docker
             append: true
+            state: present
 ...
